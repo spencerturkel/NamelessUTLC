@@ -20,13 +20,12 @@ Definition bound (t: term) : option nat :=
             (fun _ n _ m => if n && (n == m) then n else None)
             t.
 
-Definition shift (d: nat) : term -> term :=
-  (fix go (c: nat) (t: term) :=
-     match t return term with
-     | var n => if n < c then n else n + d
-     | abs t => [fun go c.+1 t]
-     | app fn arg => go c fn @ go c arg
-     end) 0.
+Definition shift (d: nat) (t: term) : term :=
+  @term_rec (fun _ => nat -> term)
+            (fun n c => if n < c then n else n + d)
+            (fun _ rec n => [fun rec n.+1])
+            (fun _ rec_f _ rec_a n => rec_f n @ rec_a n)
+            t 0.
 
 Definition substitute (substitution: term) (variable: nat) (t: term) : term :=
   @term_rec (fun _ => nat -> term -> term)
