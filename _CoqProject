@@ -1,0 +1,4 @@
+-Q . NamelessUTLC
+-arg "-w -notation-overridden,-local-declaration,-redundant-canonical-projection,-projection-no-head-constant"
+Core.v
+Language.v
