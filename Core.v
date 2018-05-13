@@ -1,14 +1,18 @@
-From mathcomp.ssreflect
-     Require Export
-     eqtype
-     seq
-     ssrbool
-     ssrfun
-     ssrnat
-     ssreflect
-.
+From mathcomp.ssreflect Require Export eqtype seq ssrbool ssrfun ssrnat ssreflect.
 Require Export Coq.Strings.String.
 From CoqUtils Require Export string.
+
+Module Export ssrbool.
+  Include Coq.ssr.ssrbool.
+End ssrbool.
+
+Module Export ssrfun.
+  Include Coq.ssr.ssrfun.
+End ssrfun.
+
+Module Export ssreflect.
+  Include Coq.ssr.ssreflect.
+End ssreflect.
 
 Global Set Implicit Arguments.
 Global Unset Strict Implicit.
@@ -26,8 +30,7 @@ Ltac decompose_context :=
 Ltac done := intuition; hnf; intros;
             solve
               [ do ![solve [intuition | apply: sym_equal; intuition
-                            | congruence
-                            | econstructor; eauto
+                            | econstructor; eauto | congruence
                             ]
                     | discriminate | contradiction
                     | constructor | progress (autorewrite with done_rw_db)
