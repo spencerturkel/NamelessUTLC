@@ -93,7 +93,7 @@ Proof. elim=> /=.
                     [apply: nbf | apply: nba] => ? ?; by apply: bounded_leq; eauto.
 Qed.
 
-Theorem boundEqP : forall t n, bound t == n -> forall m, n <= m -> bounded m t.
+Lemma boundEqP : forall t n, bound t == n -> forall m, n <= m -> bounded m t.
 Proof. move=> t n. rewrite eqn_leq. move/andP=> [H _]. by move/boundP: H. Qed.
 
 Definition shift_over (d: nat) : term -> nat -> term :=
@@ -104,23 +104,15 @@ Definition shift_over (d: nat) : term -> nat -> term :=
 
 Definition shift (d: nat) : term -> term := shift_over d ^~ 0.
 
-Eval compute in shift 2 [fun [fun 1 @ (0 @ 2)]].
-Eval compute in shift 2 [fun [fun 0 @ 1 @ [fun 0 @ 1 @ 2]]].
-Eval compute in bound [fun [fun 0 @ 1 @ [fun 0 @ 1 @ 2]]].
-Eval compute in bound (shift 2 [fun [fun 0 @ 1 @ [fun 0 @ 1 @ 2]]]).
+Lemma bound_shift_over {n t} : bounded n t -> forall {c d}, bounded (n + d) (shift_over d t c).
+Proof. elim=> //= {n t}.
+  move=> ? k ? c *. constructor. case: (k < c).
+  - by apply: ltn_addr.
+  - by rewrite ltn_add2r.
+Qed.
 
-Theorem bound_shift : forall t m, bound t = Some m -> forall d, bound (shift d t) = Some (m + d).
-Proof. elim=> //=.
-  - move=> ? ?. case=> <- ?. by rewrite -addnS -addn1 addnA addnC addnA [1 + _]addnC addn1.
-  - move=> t. case: (bound t) => //=. move=> n. move/(_ _ Logic.eq_refl)=> IH m.
-    case=> <- d. case: t IH => /=.
-    + move=
-  - move=> f IHf a IHa m /=.
-    case: (bound f) IHf => [bf|] //. move/(_ _ Logic.eq_refl)=> IHf.
-    case: (bound a) IHa => [ba|] //. move/(_ _ Logic.eq_refl)=> IHa.
-    case eq: (Some bf == Some ba) => //=. case=> {m} <-. case/eqP: eq IHa => {ba} <- IHa.
-    move=> d. by rewrite -/(shift d f) !IHf -/(shift d a) IHa eq_refl.
-Abort All.
+Theorem bound_shift {n t d} : bounded n t -> bounded (n + d) (shift d t).
+Proof. move=> *. by apply: bound_shift_over. Qed.
 
 Definition substitute (substitution: term) (variable: nat) (t: term) : term :=
   @term_rec (fun _ => nat -> term -> term)
@@ -128,3 +120,8 @@ Definition substitute (substitution: term) (variable: nat) (t: term) : term :=
            (fun _ rec v s => [fun rec v.+1 (shift 1 s)])
            (fun _ rec_fn _ rec_arg v s => rec_fn v s @ rec_arg v s)
            t variable substitution.
+
+Theorem bound_substitute {n t}
+  : bounded n t -> forall s, bounded n s -> forall v, bounded n (substitute s v t).
+Proof.
+Admitted.
