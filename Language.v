@@ -20,16 +20,6 @@ Definition bound (t: term) : nat :=
             (fun _ n _ m => maxn n m)
             t.
 
-Eval compute in bound 0.
-Eval compute in bound (0 @ 0).
-Eval compute in bound [fun 0 @ 0].
-Eval compute in bound 1.
-Eval compute in bound (1 @ 0).
-Eval compute in bound [fun 1 @ 0].
-Eval compute in bound [fun [fun 1 @ (0 @ 1 @ 4)]].
-Eval compute in bound [fun [fun 0]].
-Eval compute in bound [fun [fun [fun [fun 1 @ (0 @ 1 @ 4)]]]].
-
 Inductive bounded (n: nat) : term -> Prop :=
 | BoundedVar k (lt: k < n) : bounded n k
 | BoundedAbs t (t_bounded: bounded n.+1 t) : bounded n [fun t]
@@ -66,6 +56,17 @@ Qed.
 
 Hint Resolve bounded_leq.
 
+Lemma maxn_leq_andb n m p : maxn n m <= p = (n <= p) && (m <= p).
+Proof. case n_leq_m: (n <= m); move: (n_leq_m).
+  * move/maxn_idPl. rewrite maxnC => ->. case m_leq_p: (m <= p).
+    -- by move: (leq_trans n_leq_m m_leq_p).
+    -- by rewrite andbF.
+  * move/negbT. rewrite -ltnNge. move/ltnW/maxn_idPr. rewrite maxnC=> ->.
+    case n_leq_p: (n <= p) => //.
+    move/negbT: n_leq_m n_leq_p. rewrite -ltnNge.
+    move/ltnW=> m_leq_n n_leq_p. by move: (leq_trans m_leq_n n_leq_p).
+Qed.
+
 Theorem boundP : forall t n, reflect (forall m, n <= m -> bounded m t) (bound t <= n).
 Proof. elim=> /=.
   - move=> n1 n2. apply: introP.
@@ -83,22 +84,17 @@ Proof. elim=> /=.
     + move/(elimN (IH n.+1))=> {IH} contra. move/(_ n (leqnn _))/invert_bounded => H.
       apply: contra => m lt. by apply: bounded_leq; eauto.
   - move=> f IHf a IHa n.
-    have ->: forall n m p, maxn n m <= p = (n <= p) && (m <= p).
-    + clear=> n m p. case n_leq_m: (n <= m); move: (n_leq_m).
-      * move/maxn_idPl. rewrite maxnC => ->. case m_leq_p: (m <= p).
-        -- by move: (leq_trans n_leq_m m_leq_p).
-        -- by rewrite andbF.
-      * move/negbT. rewrite -ltnNge. move/ltnW/maxn_idPr. rewrite maxnC=> ->.
-        case n_leq_p: (n <= p) => //.
-        move/negbT: n_leq_m n_leq_p. rewrite -ltnNge.
-        move/ltnW=> m_leq_n n_leq_p. by move: (leq_trans m_leq_n n_leq_p).
-    + apply: introP.
-      * move/andP=> [bf_leq ba_leq] m leq. move/(fun x => leq_trans x leq): bf_leq => ?.
-        move/(fun x => leq_trans x leq): ba_leq => {leq} ?.
+    rewrite maxn_leq_andb.
+    apply: introP.
+    + move/andP=> [bf_leq ba_leq] m leq. move/(fun x => leq_trans x leq): bf_leq => ?.
+      move/(fun x => leq_trans x leq): ba_leq => {leq} ?.
         by constructor; [apply: IHf | apply: IHa]; eauto.
-      * move/nandP=> [/IHf-nbf | /IHa-nba] /(_ n (leqnn _))/invert_bounded-[? ?];
-                      [apply: nbf | apply: nba] => ? ?; by apply: bounded_leq; eauto.
+    + move/nandP=> [/IHf-nbf | /IHa-nba] /(_ n (leqnn _))/invert_bounded-[? ?];
+                    [apply: nbf | apply: nba] => ? ?; by apply: bounded_leq; eauto.
 Qed.
+
+Theorem boundEqP : forall t n, bound t == n -> forall m, n <= m -> bounded m t.
+Proof. move=> t n. rewrite eqn_leq. move/andP=> [H _]. by move/boundP: H. Qed.
 
 Definition shift_over (d: nat) : term -> nat -> term :=
   @term_rec (fun _ => nat -> term)
