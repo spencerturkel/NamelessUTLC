@@ -123,5 +123,8 @@ Definition substitute (substitution: term) (variable: nat) (t: term) : term :=
 
 Theorem bound_substitute {n t}
   : bounded n t -> forall s, bounded n s -> forall v, bounded n (substitute s v t).
-Proof.
-Admitted.
+Proof. elim=> //= {n t}.
+  - move=> ? k ? ? ? v. by case: (k == v).
+  - move=> ? ? ? IH ? bs ?. constructor.
+    move/bound_shift: bs. move/(_ 1). rewrite addn1. by move/IH.
+Qed.
