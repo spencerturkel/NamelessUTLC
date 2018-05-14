@@ -13,6 +13,29 @@ Notation "fn @ arg" :=
     (at level 50, arg at next level, left associativity) : term_scope.
 Global Open Scope term_scope.
 
+Fixpoint eqt (t1 t2: term) : bool :=
+  match t1, t2 with
+  | var n1, var n2 => n1 == n2
+  | abs t1, abs t2 => eqt t1 t2
+  | app fn1 arg1, app fn2 arg2 => eqt fn1 fn2 && eqt arg1 arg2
+  | _, _ => false
+  end.
+
+Theorem eqtP : Equality.axiom eqt.
+Proof. move=> t1 t2. apply: introP.
+  - elim: t1 t2 => //=.
+    + move=> n. case=> // ?. by move/eqP.
+    + move=> ? IH. case=> // ?. by move/IH.
+    + move=> ? IHf ? IHa. case=> // ? ?. by move/andP=> [/(IHf _)-> /(IHa _)->].
+  - elim: t1 t2 => //=.
+    + move=> n. case=> // ?. by move/eqP.
+    + move=> ? IH. case=> // ?. by move/IH.
+    + move=> ? IHf ? IHa. case=> // ? ?. move/nandP. by case=> [/IHf | /IHa].
+Qed.
+
+Definition term_eqMixin := EqMixin eqtP.
+Canonical term_eqType := Eval hnf in EqType term term_eqMixin.
+
 Definition bound (t: term) : nat :=
   @term_rec (fun _ => nat)
             (fun n => n.+1)

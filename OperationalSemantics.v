@@ -14,7 +14,16 @@ Fixpoint step (t: term) : option term :=
   match t with
   | var n => None
   | abs t => None
-  | app (abs t1) (abs t2) => Some (unshift (substitute (shift 1 t2) 0 t1))
+  | app (abs t1) (abs t2) => Some (unshift (substitute (shift 1 (abs t2)) 0 t1))
   | app (abs t1) arg => fmap (app (abs t1)) (step arg)
   | app fn arg => fmap (app ^~ arg) (step fn)
   end.
+
+Definition list_gen (A: Type) (F: Type) := option (A * F).
+
+CoInductive Nu (F: Type -> Type) := Finality {A: Type; coalg: A -> F A; x: A}.
+
+Definition steps t : Nu (list_gen term) := {| coalg := fmap (fun x => pair x x) \o step; x := t |}.
+
+From mathcomp Require Import ssreflect.path.
+Definition finite_steps := sorted [rel t1 t2 : term | step t1 == Some t2].
