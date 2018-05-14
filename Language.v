@@ -1,4 +1,4 @@
-Require Export NamelessUTLC.Core.
+Require Export NamelessUTLC.Functor.
 
 Inductive term : Set := var (n: nat) :> term | abs (t: term) | app (fn: term) (arg: term).
 
@@ -13,19 +13,118 @@ Notation "fn @ arg" :=
     (at level 50, arg at next level, left associativity) : term_scope.
 Global Open Scope term_scope.
 
-Definition bound (t: term) : option nat :=
-  @term_rec (fun _ => option nat)
-            (fun n => Some n.+1)
-            (fun _ n => Some n.-1)
-            (fun _ n _ m => if n && (n == m) then n else None)
+Definition bound (t: term) : nat :=
+  @term_rec (fun _ => nat)
+            (fun n => n.+1)
+            (fun _ => predn)
+            (fun _ n _ m => maxn n m)
             t.
 
-Definition shift (d: nat) (t: term) : term :=
+Eval compute in bound 0.
+Eval compute in bound (0 @ 0).
+Eval compute in bound [fun 0 @ 0].
+Eval compute in bound 1.
+Eval compute in bound (1 @ 0).
+Eval compute in bound [fun 1 @ 0].
+Eval compute in bound [fun [fun 1 @ (0 @ 1 @ 4)]].
+Eval compute in bound [fun [fun 0]].
+Eval compute in bound [fun [fun [fun [fun 1 @ (0 @ 1 @ 4)]]]].
+
+Inductive bounded (n: nat) : term -> Prop :=
+| BoundedVar k (lt: k < n) : bounded n k
+| BoundedAbs t (t_bounded: bounded n.+1 t) : bounded n [fun t]
+| BoundedApp t1 (t1_bounded: bounded n t1) t2 (t2_bounded: bounded n t2) : bounded n (t1 @ t2).
+
+Hint Constructors bounded.
+
+Lemma invert_bounded n t (H: bounded n t)
+  : match t return Prop with
+    | var k => k < n
+    | abs t => bounded n.+1 t
+    | app fn arg => bounded n fn /\ bounded n arg
+    end.
+Proof. case: t H => *; match goal with
+                 | [ H: bounded _ _ |- _ ] => by inversion H
+                 end. Qed.
+
+Lemma boundedS : forall t n, bounded n t -> bounded n.+1 t.
+Proof. elim; move=> *; match goal with
+                 | [H: bounded _ _ |- _] => move: H; by invert
+                 end.
+Qed.
+
+Hint Resolve boundedS.
+
+Lemma bounded_leq : forall t n, bounded n t -> forall m, n <= m -> bounded m t.
+Proof. elim.
+  - move=> ? ? /invert_bounded-? ? ?. constructor. by apply: leq_trans; eauto.
+  - move=> ? IH ? /invert_bounded-? ? ?. constructor. by apply: IH; eauto.
+  - move=> ? IHf ? IHa ? /invert_bounded-[? ?] ? ?. constructor.
+    + by apply: IHf; eauto.
+    + by apply: IHa; eauto.
+Qed.
+
+Hint Resolve bounded_leq.
+
+Theorem boundP : forall t n, reflect (forall m, n <= m -> bounded m t) (bound t <= n).
+Proof. elim=> /=.
+  - move=> n1 n2. apply: introP.
+    + constructor. by apply: leq_trans; eauto.
+    + rewrite -leqNgt => H. move/(_ n2 (leqnn n2))/invert_bounded.
+      rewrite ltn_neqAle. move/andP=> [neq H']. move/andP/anti_leq: (conj H H').
+      by move/eqP: neq.
+  - move=> t IH n.
+    have leq_sub1_add1: forall n m, (n.-1 <= m) = (n <= m.+1) by elim.
+    rewrite {}leq_sub1_add1. apply: introP.
+    + move=> Hbound m Hm.
+      constructor. apply: IH.
+      * exact: Hbound.
+      * by rewrite ltnS.
+    + move/(elimN (IH n.+1))=> {IH} contra. move/(_ n (leqnn _))/invert_bounded => H.
+      apply: contra => m lt. by apply: bounded_leq; eauto.
+  - move=> f IHf a IHa n.
+    have ->: forall n m p, maxn n m <= p = (n <= p) && (m <= p).
+    + clear=> n m p. case n_leq_m: (n <= m); move: (n_leq_m).
+      * move/maxn_idPl. rewrite maxnC => ->. case m_leq_p: (m <= p).
+        -- by move: (leq_trans n_leq_m m_leq_p).
+        -- by rewrite andbF.
+      * move/negbT. rewrite -ltnNge. move/ltnW/maxn_idPr. rewrite maxnC=> ->.
+        case n_leq_p: (n <= p) => //.
+        move/negbT: n_leq_m n_leq_p. rewrite -ltnNge.
+        move/ltnW=> m_leq_n n_leq_p. by move: (leq_trans m_leq_n n_leq_p).
+    + apply: introP.
+      * move/andP=> [bf_leq ba_leq] m leq. move/(fun x => leq_trans x leq): bf_leq => ?.
+        move/(fun x => leq_trans x leq): ba_leq => {leq} ?.
+        by constructor; [apply: IHf | apply: IHa]; eauto.
+      * move/nandP=> [/IHf-nbf | /IHa-nba] /(_ n (leqnn _))/invert_bounded-[? ?];
+                      [apply: nbf | apply: nba] => ? ?; by apply: bounded_leq; eauto.
+Qed.
+
+Definition shift_over (d: nat) : term -> nat -> term :=
   @term_rec (fun _ => nat -> term)
             (fun n c => if n < c then n else n + d)
-            (fun _ rec n => [fun rec n.+1])
-            (fun _ rec_f _ rec_a n => rec_f n @ rec_a n)
-            t 0.
+            (fun _ rec c => [fun rec c.+1])
+            (fun _ rec_f _ rec_a c => rec_f c @ rec_a c).
+
+Definition shift (d: nat) : term -> term := shift_over d ^~ 0.
+
+Eval compute in shift 2 [fun [fun 1 @ (0 @ 2)]].
+Eval compute in shift 2 [fun [fun 0 @ 1 @ [fun 0 @ 1 @ 2]]].
+Eval compute in bound [fun [fun 0 @ 1 @ [fun 0 @ 1 @ 2]]].
+Eval compute in bound (shift 2 [fun [fun 0 @ 1 @ [fun 0 @ 1 @ 2]]]).
+
+Theorem bound_shift : forall t m, bound t = Some m -> forall d, bound (shift d t) = Some (m + d).
+Proof. elim=> //=.
+  - move=> ? ?. case=> <- ?. by rewrite -addnS -addn1 addnA addnC addnA [1 + _]addnC addn1.
+  - move=> t. case: (bound t) => //=. move=> n. move/(_ _ Logic.eq_refl)=> IH m.
+    case=> <- d. case: t IH => /=.
+    + move=
+  - move=> f IHf a IHa m /=.
+    case: (bound f) IHf => [bf|] //. move/(_ _ Logic.eq_refl)=> IHf.
+    case: (bound a) IHa => [ba|] //. move/(_ _ Logic.eq_refl)=> IHa.
+    case eq: (Some bf == Some ba) => //=. case=> {m} <-. case/eqP: eq IHa => {ba} <- IHa.
+    move=> d. by rewrite -/(shift d f) !IHf -/(shift d a) IHa eq_refl.
+Abort All.
 
 Definition substitute (substitution: term) (variable: nat) (t: term) : term :=
   @term_rec (fun _ => nat -> term -> term)
