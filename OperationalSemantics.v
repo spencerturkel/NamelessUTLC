@@ -49,8 +49,8 @@ Lemma option_fmap_Some {A B f} {mx: option A} {y: B}
   : fmap f mx = Some y -> {x | mx = Some x /\ f x = y}.
 Proof. case: mx => //= ?. by case. Qed.
 
-Theorem reduce_contains_cbv : forall t t', cbv_step t = Some t' -> t' \in reduce t.
-Proof. elim=> //= fn IHfn arg IHarg t.
+Theorem cbv_in_reduce : forall t t', (cbv_step t == Some t') ==> (t' \in reduce t).
+Proof. elim=> //= fn IHfn arg _ t.
   have H: match fn with
            | [ fun body] =>
              match arg with
@@ -58,19 +58,31 @@ Proof. elim=> //= fn IHfn arg IHarg t.
              | _ => fmap (app^~ arg) (cbv_step fn)
              end
            | _ => fmap (app^~ arg) (cbv_step fn)
-          end = Some t ->
+          end == Some t ->
           (exists body, fn = [fun body] /\
                    (exists argbody, arg = [fun argbody] /\
                                 unshift (substitute (shift 1 [ fun argbody]) 0 body) = t))
-          \/ (exists fn', cbv_step fn = Some fn' /\ fn' @ arg = t).
+          \/ (exists fn', cbv_step fn == Some fn' /\ fn' @ arg = t).
   {
     case: fn {IHfn} => //.
-    - move=> ?. case: arg {IHarg} => //. move=> ?. case=> //.
-    - move=> ? ? /option_fmap_Some-?. by right.
+    - move=> ?. case: arg => //. move=> ?. by case/eqP.
+    - move=> ? ? /eqP/option_fmap_Some-[fn' ?]. right. exists fn'. by split; [apply/eqP|].
   }
+  apply/implyP.
   move/H=> {H}. case.
   - move=> [? [-> [? [-> ->]]]] /=. by rewrite in_cons eq_refl.
-  - move=> [fn' [/IHfn-IH <-]] /= {IHfn IHarg}. rewrite mem_cat.
+  - move=> [fn' [H <-]]. move/(_ fn'): IHfn. rewrite {}H /= mem_cat => ?.
     apply/orP. right. rewrite mem_cat. apply/orP. left.
     by apply: map_f.
 Qed.
+
+Corollary reduce_nil_cbv_None t : nilp (reduce t) ==> ~~ cbv_step t.
+Proof. rewrite implybN. apply/implyP=> H.
+  case H: (cbv_step t) H => _ //.
+  move/eqP/(implyP (cbv_in_reduce _ _)): H.
+  by case: (reduce t).
+Qed.
+
+Theorem reduce_nil_cbn_None : forall t t', (cbn_step t == Some t') ==> (t' \in reduce t).
+Proof.
+Admitted.
