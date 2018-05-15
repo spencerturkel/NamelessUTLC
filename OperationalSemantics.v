@@ -8,22 +8,69 @@ Fixpoint unshift (t: term) :=
   end.
 
 Theorem unshift_bounded {n t} : bounded n t -> bounded n (unshift t).
-Proof. elim=> //=. constructor. by case: k lt. Qed.
+Proof. elim=> //=. move=> {n t} ? k lt. constructor. by case: k lt. Qed.
 
-Fixpoint step (t: term) : option term :=
+Fixpoint reduce (t: term) : seq term :=
+  match t with
+  | var n => [::]
+  | abs t => map abs (reduce t)
+  | app fn arg =>
+    (if fn is abs body
+     then [:: unshift (substitute (shift 1 arg) 0 body)]
+     else [::]) ++ map (app ^~ arg) (reduce fn) ++ map (app fn) (reduce arg)
+  end.
+
+Fixpoint normal_step (t: term) : option term :=
+  match t with
+  | var n => None
+  | abs t => fmap abs (normal_step t)
+  | app (abs body) arg => Some (unshift (substitute (shift 1 arg) 0 body))
+  | app fn arg => fmap (app ^~ arg) (normal_step fn)
+  end.
+
+Fixpoint cbn_step (t: term) : option term :=
   match t with
   | var n => None
   | abs t => None
-  | app (abs t1) (abs t2) => Some (unshift (substitute (shift 1 (abs t2)) 0 t1))
-  | app (abs t1) arg => fmap (app (abs t1)) (step arg)
-  | app fn arg => fmap (app ^~ arg) (step fn)
+  | app (abs body) arg => Some (unshift (substitute (shift 1 arg) 0 body))
+  | app fn arg => fmap (app ^~ arg) (cbn_step fn)
   end.
 
-Definition list_gen (A: Type) (F: Type) := option (A * F).
+Fixpoint cbv_step (t: term) : option term :=
+  match t with
+  | var n => None
+  | abs t => None
+  | app [fun body] [fun argbody] =>
+    Some (unshift (substitute (shift 1 [fun argbody]) 0 body))
+  | app fn arg => fmap (app ^~ arg) (cbv_step fn)
+  end.
 
-CoInductive Nu (F: Type -> Type) := Finality {A: Type; coalg: A -> F A; x: A}.
+Lemma option_fmap_Some {A B f} {mx: option A} {y: B}
+  : fmap f mx = Some y -> {x | mx = Some x /\ f x = y}.
+Proof. case: mx => //= ?. by case. Qed.
 
-Definition steps t : Nu (list_gen term) := {| coalg := fmap (fun x => pair x x) \o step; x := t |}.
-
-From mathcomp Require Import ssreflect.path.
-Definition finite_steps := sorted [rel t1 t2 : term | step t1 == Some t2].
+Theorem reduce_contains_cbv : forall t t', cbv_step t = Some t' -> t' \in reduce t.
+Proof. elim=> //= fn IHfn arg IHarg t.
+  have H: match fn with
+           | [ fun body] =>
+             match arg with
+             | [ fun argbody] => Some (unshift (substitute (shift 1 [ fun argbody]) 0 body))
+             | _ => fmap (app^~ arg) (cbv_step fn)
+             end
+           | _ => fmap (app^~ arg) (cbv_step fn)
+          end = Some t ->
+          (exists body, fn = [fun body] /\
+                   (exists argbody, arg = [fun argbody] /\
+                                unshift (substitute (shift 1 [ fun argbody]) 0 body) = t))
+          \/ (exists fn', cbv_step fn = Some fn' /\ fn' @ arg = t).
+  {
+    case: fn {IHfn} => //.
+    - move=> ?. case: arg {IHarg} => //. move=> ?. case=> //.
+    - move=> ? ? /option_fmap_Some-?. by right.
+  }
+  move/H=> {H}. case.
+  - move=> [? [-> [? [-> ->]]]] /=. by rewrite in_cons eq_refl.
+  - move=> [fn' [/IHfn-IH <-]] /= {IHfn IHarg}. rewrite mem_cat.
+    apply/orP. right. rewrite mem_cat. apply/orP. left.
+    by apply: map_f.
+Qed.
