@@ -49,7 +49,7 @@ Lemma option_fmap_Some {A B f} {mx: option A} {y: B}
   : fmap f mx = Some y -> {x | mx = Some x /\ f x = y}.
 Proof. case: mx => //= ?. by case. Qed.
 
-Theorem cbv_in_reduce : forall t t', (cbv_step t == Some t') ==> (t' \in reduce t).
+Theorem cbv_in_reduce : forall {t t'}, (cbv_step t == Some t') ==> (t' \in reduce t).
 Proof. elim=> //= fn IHfn arg _ t.
   have H: match fn with
            | [ fun body] =>
@@ -76,14 +76,14 @@ Proof. elim=> //= fn IHfn arg _ t.
     by apply: map_f.
 Qed.
 
-Corollary reduce_nil_cbv_None t : nilp (reduce t) ==> ~~ cbv_step t.
+Corollary reduce_nil_cbv_None {t} : nilp (reduce t) ==> ~~ cbv_step t.
 Proof. rewrite implybN. apply/implyP=> H.
   case H: (cbv_step t) H => _ //.
-  move/eqP/(implyP (cbv_in_reduce _ _)): H.
+  move/eqP/(implyP cbv_in_reduce): H.
   by case: (reduce t).
 Qed.
 
-Theorem cbn_in_reduce : forall t t', (cbn_step t == Some t') ==> (t' \in reduce t).
+Theorem cbn_in_reduce : forall {t t'}, (cbn_step t == Some t') ==> (t' \in reduce t).
 Proof. elim=> //= fn IHfn arg _ t.
   have H: (match fn with
            | [ fun body] => Some (unshift (substitute (shift 1 arg) 0 body))
@@ -104,7 +104,7 @@ Proof. elim=> //= fn IHfn arg _ t.
     by apply: map_f.
 Qed.
 
-Theorem normal_in_reduce : forall t t', (normal_step t == Some t') ==> (t' \in reduce t).
+Theorem normal_in_reduce : forall {t t'}, (normal_step t == Some t') ==> (t' \in reduce t).
 Proof. elim=> //=.
   - move=> t IH t'. apply/implyP=> /eqP/option_fmap_Some-H.
     move: H IH => [body [-> <-]] /(_ body)/implyP/(_ (eq_refl _)).
@@ -130,9 +130,9 @@ Proof. elim=> //=.
       rewrite eq_refl /= => /(map_f (app^~ arg)). by rewrite !mem_cat.
 Qed.
 
-Theorem reduce_nil_normal_None : forall t, nilp (reduce t) ==> ~~ normal_step t.
+Theorem reduce_nil_normal_None : forall {t}, nilp (reduce t) ==> ~~ normal_step t.
 Proof. move=> t. case reduction_nil: (nilp (reduce t)) => //=.
   apply/negP. case normal_steps_some: (normal_step t) => //=.
-  move/eqP/(implyP (normal_in_reduce _ _)): normal_steps_some.
+  move/eqP/(implyP normal_in_reduce): normal_steps_some.
   by move/nilP: reduction_nil=> ->.
 Qed.
