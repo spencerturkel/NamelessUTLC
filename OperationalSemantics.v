@@ -131,16 +131,8 @@ Proof. elim=> //=.
 Qed.
 
 Theorem reduce_nil_normal_None : forall t, nilp (reduce t) ==> ~~ normal_step t.
-Proof. elim=> //=.
-  - move=> t. case: (reduce t) => //=. by case: (normal_step t).
-  - case=> //.
-    + move=> * /=. exact: implybT.
-    + move=> fn arg IHapp arg' IHarg'. apply/implyP=> H.
-      case: (normal_step (fn @ arg)) IHapp => ? //.
-      simpl (fmap _ _). simpl (~~ Some _). rewrite implybF.
-      apply/implyP. rewrite implybF. apply/negPn.
-      rewrite /cat -/cat in H. apply/nilP/size0nil.
-      move/nilP: H. move/(f_equal size).
-      rewrite /size -/size size_cat. move/eqP. rewrite addn_eq0 => /andP-[H _].
-      move/eqP: H. by rewrite size_map.
+Proof. move=> t. case reduction_nil: (nilp (reduce t)) => //=.
+  apply/negP. case normal_steps_some: (normal_step t) => //=.
+  move/eqP/(implyP (normal_in_reduce _ _)): normal_steps_some.
+  by move/nilP: reduction_nil=> ->.
 Qed.
