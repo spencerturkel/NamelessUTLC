@@ -129,3 +129,18 @@ Proof. elim=> //=.
     + move: H IHfn => [fn' [-> ->]] /(_ fn').
       rewrite eq_refl /= => /(map_f (app^~ arg)). by rewrite !mem_cat.
 Qed.
+
+Theorem reduce_nil_normal_None : forall t, nilp (reduce t) ==> ~~ normal_step t.
+Proof. elim=> //=.
+  - move=> t. case: (reduce t) => //=. by case: (normal_step t).
+  - case=> //.
+    + move=> * /=. exact: implybT.
+    + move=> fn arg IHapp arg' IHarg'. apply/implyP=> H.
+      case: (normal_step (fn @ arg)) IHapp => ? //.
+      simpl (fmap _ _). simpl (~~ Some _). rewrite implybF.
+      apply/implyP. rewrite implybF. apply/negPn.
+      rewrite /cat -/cat in H. apply/nilP/size0nil.
+      move/nilP: H. move/(f_equal size).
+      rewrite /size -/size size_cat. move/eqP. rewrite addn_eq0 => /andP-[H _].
+      move/eqP: H. by rewrite size_map.
+Qed.
