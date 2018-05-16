@@ -83,6 +83,49 @@ Proof. rewrite implybN. apply/implyP=> H.
   by case: (reduce t).
 Qed.
 
-Theorem reduce_nil_cbn_None : forall t t', (cbn_step t == Some t') ==> (t' \in reduce t).
-Proof.
-Admitted.
+Theorem cbn_in_reduce : forall t t', (cbn_step t == Some t') ==> (t' \in reduce t).
+Proof. elim=> //= fn IHfn arg _ t.
+  have H: (match fn with
+           | [ fun body] => Some (unshift (substitute (shift 1 arg) 0 body))
+           | _ => fmap (app^~ arg) (cbn_step fn)
+           end == Some t) ->
+          (exists body, fn = [fun body] /\ unshift (substitute (shift 1 arg) 0 body) = t)
+          \/ (fmap (app^~ arg) (cbn_step fn) = Some t).
+  {
+    case: fn {IHfn} => //.
+    - move=> ?. by case/eqP.
+    - move=> fn arg'. by move/eqP/option_fmap_Some=> [? [-> <-]].
+  }
+  apply/implyP. move/H=> {H}. case.
+  - move=> [body [-> <-]]. by rewrite in_cons eq_refl.
+  - move=> H. move/option_fmap_Some: H IHfn => {t}[t [-> <-]].
+    move/(_ t)/implyP/(_ (eq_refl _)) => H.
+    rewrite mem_cat. apply/orP. right. rewrite mem_cat. apply/orP. left.
+    by apply: map_f.
+Qed.
+
+Theorem normal_in_reduce : forall t t', (normal_step t == Some t') ==> (t' \in reduce t).
+Proof. elim=> //=.
+  - move=> t IH t'. apply/implyP=> /eqP/option_fmap_Some-H.
+    move: H IH => [body [-> <-]] /(_ body)/implyP/(_ (eq_refl _)).
+    by apply: map_f.
+  - move=> fn IHfn arg IHarg t.
+    have H: (match fn with
+             | [ fun body] => Some (unshift (substitute (shift 1 arg) 0 body))
+             | _ => fmap (app^~ arg) (normal_step fn)
+             end == Some t) ->
+            (exists body, fn = [fun body] /\
+                     t = unshift (substitute (shift 1 arg) 0 body))
+            \/ (exists fn', normal_step fn = Some fn' /\ t = app fn' arg).
+    {
+      case: fn IHfn => //.
+      - move=> ? _. by case/eqP.
+      - move=> fn arg' IHfn H.
+        move: H IHfn => /eqP/option_fmap_Some-[t' [-> <-]] /(_ t').
+        by rewrite eq_refl.
+    }
+    apply/implyP. case/H=> {H} H.
+    + move: H => [? [-> ->]]. by rewrite mem_cat in_cons eq_refl.
+    + move: H IHfn => [fn' [-> ->]] /(_ fn').
+      rewrite eq_refl /= => /(map_f (app^~ arg)). by rewrite !mem_cat.
+Qed.
