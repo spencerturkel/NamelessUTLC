@@ -136,8 +136,15 @@ Proof. elim=> //=.
         + move=> _. case: (normal_step arg) IHarg => [arg''|] //=.
           move/(_ arg''). rewrite eq_refl /= => ? /eqP. by case=> <-.
     }
-    apply/implyP. case/H=> {H}.
-Admitted.
+    apply/implyP. case/H=> {H}; [|case].
+    + move=> [body [-> ->]]. by rewrite in_cons eq_refl.
+    + move=> H. move: H IHfn => [fn' [-> ->]] /(_ fn'). rewrite eq_refl /= => H.
+      rewrite mem_cat. apply/orP. right. rewrite mem_cat. apply/orP. left.
+      by apply: map_f.
+    + move=> H. move: H IHarg => [_ /option_fmap_Some-[arg' [-> <-]]].
+      move/(_ arg'). rewrite eq_refl /= => H.
+      do !(rewrite mem_cat; apply/orP; right). by apply: map_f.
+Qed.
 
 Lemma reduce_nil_normal_None : forall {t}, nilp (reduce t) ==> ~~ normal_step t.
 Proof. move=> t. case reduction_nil: (nilp (reduce t)) => //=.
