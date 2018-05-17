@@ -25,7 +25,11 @@ Fixpoint normal_step (t: term) : option term :=
   | var n => None
   | abs t => fmap abs (normal_step t)
   | app (abs body) arg => Some (unshift (substitute (shift 1 arg) 0 body))
-  | app fn arg => fmap (app ^~ arg) (normal_step fn)
+  | app fn arg =>
+    (match normal_step fn with
+     | Some fn' => Some (fn' @ arg)
+     | None => fmap (app fn) (normal_step arg)
+     end)
   end.
 
 Fixpoint cbn_step (t: term) : option term :=
@@ -112,27 +116,32 @@ Proof. elim=> //=.
   - move=> fn IHfn arg IHarg t.
     have H: (match fn with
              | [ fun body] => Some (unshift (substitute (shift 1 arg) 0 body))
-             | _ => fmap (app^~ arg) (normal_step fn)
+             | _ => match normal_step fn with
+                   | Some fn' => Some (fn' @ arg)
+                   | None => fmap (app fn) (normal_step arg)
+                   end
              end == Some t) ->
             (exists body, fn = [fun body] /\
                      t = unshift (substitute (shift 1 arg) 0 body))
-            \/ (exists fn', normal_step fn = Some fn' /\ t = app fn' arg).
+            \/ (exists fn', normal_step fn = Some fn' /\ t = app fn' arg)
+            \/ (normal_step fn = None /\
+               fmap (app fn) (normal_step arg) = Some t).
     {
       case: fn IHfn => //.
+      - move=> ? _. by move/eqP.
       - move=> ? _. by case/eqP.
-      - move=> fn arg' IHfn H.
-        move: H IHfn => /eqP/option_fmap_Some-[t' [-> <-]] /(_ t').
-        by rewrite eq_refl.
-    }
-    apply/implyP. case/H=> {H} H.
-    + move: H => [? [-> ->]]. by rewrite mem_cat in_cons eq_refl.
-    + move: H IHfn => [fn' [-> ->]] /(_ fn').
-      rewrite eq_refl /= => /(map_f (app^~ arg)). by rewrite !mem_cat.
-Qed.
+      - admit.
+Admitted.
 
-Theorem reduce_nil_normal_None : forall {t}, nilp (reduce t) ==> ~~ normal_step t.
+Lemma reduce_nil_normal_None : forall {t}, nilp (reduce t) ==> ~~ normal_step t.
 Proof. move=> t. case reduction_nil: (nilp (reduce t)) => //=.
   apply/negP. case normal_steps_some: (normal_step t) => //=.
   move/eqP/(implyP normal_in_reduce): normal_steps_some.
   by move/nilP: reduction_nil=> ->.
 Qed.
+
+Theorem normal_None_reduce_nil : forall {t}, ~~ normal_step t ==> nilp (reduce t).
+Proof. elim=> //=.
+  - move=> t. by case: (normal_step t) => // /nilP->.
+  - move=> fn IHfn arg IHarg. admit.
+Admitted.
