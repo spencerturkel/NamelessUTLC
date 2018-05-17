@@ -143,5 +143,10 @@ Qed.
 Theorem normal_None_reduce_nil : forall {t}, ~~ normal_step t ==> nilp (reduce t).
 Proof. elim=> //=.
   - move=> t. by case: (normal_step t) => // /nilP->.
-  - move=> fn IHfn arg IHarg. admit.
-Admitted.
+  - move=> fn IHfn arg IHarg.
+    case: fn IHfn => //.
+    + move=> /= ? _. case: (normal_step arg) IHarg => //=. by move/nilP=> ->.
+    + move=> fn arg'. case (normal_step (fn @ arg')) => //.
+      move: {fn arg'} (fn @ arg') => fn /nilP-> /=.
+      by case: (normal_step arg) IHarg => //= /nilP->.
+Qed.
