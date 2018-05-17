@@ -130,7 +130,13 @@ Proof. elim=> //=.
       case: fn IHfn => //.
       - move=> ? _. by move/eqP.
       - move=> ? _. by case/eqP.
-      - admit.
+      - move=> fn arg'. case: (normal_step (fn @ arg')) => [fn'|] //.
+        + move/(_ fn'). move fn_eq: (fn @ arg') => ?.
+          rewrite eq_refl /= => ? /eqP. by case=> <-.
+        + move=> _. case: (normal_step arg) IHarg => [arg''|] //=.
+          move/(_ arg''). rewrite eq_refl /= => ? /eqP. by case=> <-.
+    }
+    apply/implyP. case/H=> {H}.
 Admitted.
 
 Lemma reduce_nil_normal_None : forall {t}, nilp (reduce t) ==> ~~ normal_step t.
